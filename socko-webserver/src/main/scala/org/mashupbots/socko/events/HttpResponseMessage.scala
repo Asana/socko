@@ -32,6 +32,7 @@ import org.jboss.netty.handler.codec.spdy.SpdyHttpHeaders
 import org.mashupbots.socko.infrastructure.CharsetUtil
 import org.mashupbots.socko.infrastructure.DateUtil
 import org.mashupbots.socko.infrastructure.IOUtil
+import scala.collection.mutable
 
 /**
  * Encapsulates all the data to be sent to the client in an HTTP response; i.e. headers and content.
@@ -76,13 +77,14 @@ case class HttpResponseMessage(event: HttpEvent) {
   /**
    * Headers
    */
-  val headers = new scala.collection.mutable.HashMap[String, String]
+  val headers = new mutable.HashMap[String, mutable.Set[String]]
+    with mutable.MultiMap[String, String]
 
   /**
    * Content type as MIME code. e.g. `image/gif`. `None` if not set
    */
   def contentType = {
-    headers.get(HttpHeaders.Names.CONTENT_TYPE)
+    headers.get(HttpHeaders.Names.CONTENT_TYPE).flatMap(_.headOption)
   }
 
   /**
@@ -91,7 +93,7 @@ case class HttpResponseMessage(event: HttpEvent) {
    * @param value MIME type. e.g. `image/gif`.
    */
   def contentType_=(value: String) {
-    headers.put(HttpHeaders.Names.CONTENT_TYPE, value)
+    headers.addBinding(HttpHeaders.Names.CONTENT_TYPE, value)
   }
 
   /**
@@ -128,7 +130,9 @@ case class HttpResponseMessage(event: HttpEvent) {
     // Headers
     HttpResponseMessage.setDateHeader(response)
     HttpResponseMessage.setSpdyHeaders(request, response)
-    headers.foreach { kv => response.setHeader(kv._1, kv._2) }
+    for ((name, values) <- headers; value <- values) {
+      response.addHeader(name, value)
+    }
 
     if (request.isKeepAlive) {
       // Add 'Content-Length' header only for a keep-alive connection.
@@ -148,7 +152,7 @@ case class HttpResponseMessage(event: HttpEvent) {
       future.addListener(ChannelFutureListener.CLOSE)
     }
 
-    hasBeenWritten = true;
+    hasBeenWritten = true
   }
 
   /**
@@ -202,7 +206,7 @@ case class HttpResponseMessage(event: HttpEvent) {
    */
   def write(content: String, contentType: String, headers: Map[String, String]): Unit = {
     this.contentType = contentType
-    headers.foreach { kv => this.headers.put(kv._1, kv._2) }
+    headers.foreach { kv => this.headers.addBinding(kv._1, kv._2) }
     write(content)
   }
 
@@ -236,7 +240,7 @@ case class HttpResponseMessage(event: HttpEvent) {
    */
   def write(content: Array[Byte], contentType: String, headers: Map[String, String]): Unit = {
     this.contentType = contentType
-    headers.foreach { kv => this.headers.put(kv._1, kv._2) }
+    headers.foreach { kv => this.headers.addBinding(kv._1, kv._2) }
     write(content)
   }
 
@@ -289,7 +293,7 @@ case class HttpResponseMessage(event: HttpEvent) {
 
     this.status = status
     this.contentType = contentType
-    headers.foreach { kv => this.headers.put(kv._1, kv._2) }
+    headers.foreach { kv => this.headers.addBinding(kv._1, kv._2) }
 
     write(content)
   }
@@ -365,7 +369,7 @@ case class HttpResponseMessage(event: HttpEvent) {
     if (contentType != "") {
       this.contentType = contentType
     }
-    headers.foreach { kv => this.headers.put(kv._1, kv._2) }
+    headers.foreach { kv => this.headers.addBinding(kv._1, kv._2) }
 
     // Start totaling chunk length
     totalChunkContentLength = 0
@@ -376,15 +380,17 @@ case class HttpResponseMessage(event: HttpEvent) {
     // Headers
     HttpResponseMessage.setDateHeader(response)
     HttpResponseMessage.setSpdyHeaders(request, response)
-    this.headers.foreach { kv => response.setHeader(kv._1, kv._2) }
+    for ((name, values) <- headers; value <- values) {
+      response.addHeader(name, value)
+    }
     if (request.isKeepAlive) {
       // Add keep alive header as per HTTP 1.1 specifications
       HttpResponseMessage.setKeepAliveHeader(response, request.isKeepAlive)
     }
 
     // See http://stackoverflow.com/questions/9027322/how-to-use-chunkedstream-properly
-    response.setChunked(true);
-    response.setHeader(HttpHeaders.Names.TRANSFER_ENCODING, HttpHeaders.Values.CHUNKED);
+    response.setChunked(true)
+    response.setHeader(HttpHeaders.Names.TRANSFER_ENCODING, HttpHeaders.Values.CHUNKED)
 
     // Write the response
     val future = event.channel.write(response)
@@ -424,7 +430,7 @@ case class HttpResponseMessage(event: HttpEvent) {
    *
    * Writing the a chunk is NOT buffered. The chunk is immediately sent to the client.
    *
-   * @param chunkConent Binary content to send to the client.
+   * @param chunkContent Binary content to send to the client.
    */
   def writeChunk(chunkContent: Array[Byte]): Unit = {
     assert(writingChunks, "Must call writeFirstChunk() first")
