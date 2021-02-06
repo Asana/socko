@@ -16,11 +16,11 @@
 val shared = Seq(
   // Info
   organization := "com.github.asana.socko-asana-fork",
-  version      := "0.6.2",
-  crossScalaVersions := Seq("2.11.12", "2.12.7"),
+  version      := "0.6.3",
+  crossScalaVersions := Seq("2.12.7"),
 
   // Repositories
-  resolvers += "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/",
+  resolvers += "Typesafe Repository" at "https://repo.typesafe.com/typesafe/releases/",
   credentials += Credentials(Path.userHome / ".sbt" / ".credentials"),
   
   Test / fork := true,
@@ -57,10 +57,8 @@ lazy val webserver = (project in file("socko-webserver"))
       homepage := Some(url("https://github.com/Asana/socko-asana-fork")),
       publishMavenStyle := true,
       publishArtifact in Test := false,
-      bintrayOrganization := Some("asana"),
-      bintrayRepository := "maven",
-      bintrayPackage := "socko-asana-fork",
-      bintrayReleaseOnPublish in ThisBuild := true,
+      githubOwner := "Asana",
+      githubRepository := "socko-asana-fork",
     )
   )
 
